@@ -1,0 +1,12 @@
+FROM alpine
+
+ENV SYSLGEN_BASE=/syslgen-examples
+COPY syslgen-examples $SYSLGEN_BASE
+
+RUN apk add --no-cache python py-pip
+WORKDIR /sysl
+ADD dist/sysl-*.whl /sysl
+ADD gosysl/gosysl-linux /sysl
+
+RUN pip install sysl-*.whl
+RUN ln -s /sysl/gosysl-linux /usr/bin/syslgen
