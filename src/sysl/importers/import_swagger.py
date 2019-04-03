@@ -211,12 +211,12 @@ class SwaggerTranslator:
 
                     w(u'{}{}{}{}:',
                         method.upper(),
+                        paramStr,
                         ' ?' if params['query'] else '',
                         '&'.join(
                             '{}={}{}'.format(p['name'], TYPE_MAP[p['type']], '' if p['required'] else '?')
                             for p in params['query']
-                        ),
-                        paramStr)
+                        ))
                     with w.indent():
                         for line in textwrap.wrap(
                                 body.get('description', 'No description.').strip(), 64):
@@ -235,12 +235,19 @@ class SwaggerTranslator:
                         for key in sorted(responses):
                             schema = responses.get(key, {}).get('schema')
                             if schema is not None:
-                                if schema.get('type') == 'array':
-                                    returnValues['sequence of ' + schema['items']['$ref'].rpartition('/')[2]] = True
-                                else:
+                                if '$ref' in schema:
                                     returnValues[schema['$ref'].rpartition('/')[2]] = True
+                                elif 'type' in schema:
+                                    if schema.get('type') == 'array':
+                                        returnValues['sequence of ' + schema['items']['$ref'].rpartition('/')[2]] = True
+                                    else:
+                                        returnValues[schema['type']] = True
+                                else:
+                                    self.error('Unsupported definition: %s' % (schema))
+                                    returnValues[key] = True
+
                             else:
-                                returnValues[', '.join(responses.keys())] = True
+                                returnValues[key] = True
                             if key == 'default' or key.startswith('x-'):
                                 self.warn('default responses and x-* responses are not implemented')
 
@@ -267,6 +274,12 @@ class SwaggerTranslator:
             if 'required' in tspec:
                 requiredFields = tspec['required']
 
+            def validateFieldName(fieldName):
+                fname = re.sub('[^a-zA-Z0-9]', '_', fieldName)
+                if len(re.findall('[0-9_]',fname[0])) > 0:
+                    self.error('Invalid field name in spec: %s' % (fname))
+                return fname
+
             with w.indent():
                 def getfields(fname, ftype, isArray=False):
                     fieldTemplate = '{} <: {}:'
@@ -284,18 +297,18 @@ class SwaggerTranslator:
                 if properties:
                     for (fname, fspec) in sorted(properties.iteritems()):
                         (ftype, fdescr) = self.parse_typespec(fspec, fname, tname)
-                        w(getfields(fname, ftype))
+                        w(getfields(validateFieldName(fname), ftype))
                         with w.indent():
-                            w(self.getTag(fname, 'json_tag'))
+                            self.writeTag(fname, 'json_tag', w)
                             if fdescr is not None and len(fdescr) > 0:
-                                w(self.getTag(fdescr, 'description'))
+                                self.writeTag(fdescr, 'description', w)
                 # handle top-level arrays
                 elif tspec.get('type') == 'array':
                     (ftype, fdescr) = self.parse_typespec(tspec, '', tname)
                     w(getfields('', ftype, True))
                     with w.indent():
                         if fdescr is not None and len(fdescr) > 0:
-                            w(self.getTag(fdescr, 'description'))
+                            self.writeTag(fdescr, 'description', w)
                 elif 'enum' in tspec:
                     w(tspec.get('type'))
                 else:
@@ -317,12 +330,14 @@ class SwaggerTranslator:
                         ftypeSyntax = self.parse_typespec(v, k, typeRef)[0]
                         if 'required' not in typeSpecList[index].element or k not in typeSpecList[index].element['required']:
                             ftypeSyntax = ftypeSyntax + '?'
+
+                        fname = k if k not in SYSL_TYPES else k + '_'
                         fields = '{} <: {}:'.format(
-                            k if k not in SYSL_TYPES else k + '_',
+                            validateFieldName(fname),
                             ftypeSyntax)
                         w(fields)
                         with w.indent():
-                            w(self.getTag(k, 'json_tag'))
+                            self.writeTag(k, 'json_tag', w)
             else:
                 w('!alias EXTERNAL_{}:', typeName)
                 with w.indent():
@@ -351,7 +366,7 @@ class SwaggerTranslator:
         descr = tspec.pop('description', None)
 
         if typ == 'array':
-            assert not (set(tspec.keys()) - {'type', 'items', 'example'}), tspec
+            assert not (set(tspec.keys()) - {'type', 'items', 'example', 'minItems', 'maxItems'}), tspec
 
             # skip invalid type
             if '$ref' in tspec['items'] and 'type' in tspec['items']:
@@ -371,7 +386,7 @@ class SwaggerTranslator:
             self.error('Invalid format: %s at %s -> %s' % (fmt, typeRef, parentRef))
 
         if ref:
-            assert not set(tspec.keys()) - {'$ref'}, tspec
+            assert not set(tspec.keys()) - {'$ref', 'type', 'readOnly'}, tspec
             return r(ref.lstrip('#/definitions/'))
         if (typ, fmt) == ('string', None):
             return r('string')
@@ -405,10 +420,20 @@ class SwaggerTranslator:
             externAlias[aliasName] = 'string'
             return r(aliasName)
 
-    def getTag(self, tagName, tagType):
+    def writeTag(self, tagName, tagType, w):
         if tagType is None or tagName is None:
-            return ''
-        return '@{} = "{}"'.format(tagType, tagName)
+            return
+
+        if '\n' in tagName and tagType == 'description':
+            tagValue=''
+            for line in textwrap.wrap(tagName, 64):
+                tagValue = tagValue + u'| {}\n'.format( line)
+
+            w(u'@{} =:'.format(tagType))
+            with w.indent():
+                w(tagValue)
+        else:
+            w(u'@{} = "{}"'.format(tagType, tagName))
 
     def getHeaders(self, headerParams):
         headerList = []
@@ -434,7 +459,15 @@ class SwaggerTranslator:
 
         paramList = []
         for param in bodyParams:
-            paramList.append('{} <: {} [~body]'.format(param['name'], param['schema']['$ref'].rpartition('/')[2]))
+            if '$ref' in param['schema']:
+                paramType = param['schema']['$ref'].rpartition('/')[2]
+            elif 'type' in param['schema']:
+                paramType = param['schema']['type']
+            else:
+                self.error('Unsupported definition: %s' % (param))
+                paramType = 'unknown'
+
+            paramList.append('{} <: {} [~body]'.format(param['name'], paramType))
 
         return ', '.join(paramList)
 
