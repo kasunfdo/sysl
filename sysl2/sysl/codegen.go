@@ -245,7 +245,9 @@ func GenerateCode(rootModel, model, rootTransform, transform, grammar, start str
 		panic(err)
 	}
 
-	for _, message := range validate(grammarSysl, tx.GetApps()[transformAppName], start) {
+	validator := NewValidator(grammarSysl, tx.GetApps()[transformAppName])
+	validator.Validate(start)
+	for _, message := range validator.GetMessages() {
 		message.logMsg()
 	}
 

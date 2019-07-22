@@ -38,8 +38,15 @@ Go:
     VarDecl
     ForLoop
 
+  !type VarDecl:
+    identifier <: string
+    TypeName <: string
+
   !type Statement:
     __Choice_Statement <: __Choice_Statement
+
+  !type StatementList:
+    Statement <: Statement
 
   !table RelationalType:
     Foo <: string

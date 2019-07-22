@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidationErrorMessagesStringer(t *testing.T) {
+func TestValidationMsgStringer(t *testing.T) {
 	cases := map[string]struct {
 		input    Msg
 		expected string
@@ -29,7 +29,7 @@ func TestValidationErrorMessagesStringer(t *testing.T) {
 	}
 }
 
-func TestValidationErrorMessagesGenLogMessage(t *testing.T) {
+func TestValidationMsgGenLogMessage(t *testing.T) {
 	cases := map[string]struct {
 		input    Msg
 		expected LogMessage
@@ -60,7 +60,7 @@ func TestValidationErrorMessagesGenLogMessage(t *testing.T) {
 	}
 }
 
-func TestValidationErrorMessagesLogMsg(t *testing.T) {
+func TestValidationMsgLogMsg(t *testing.T) {
 	cases := map[string]struct {
 		input Msg
 	}{

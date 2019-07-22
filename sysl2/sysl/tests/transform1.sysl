@@ -37,7 +37,9 @@ CodeGenTransform:
 
   !view TfmValid(input <: string) -> MethodDecl:
     input -> (:
-      Receiver =  ""
+      Receiver =  input -> <Receiver> (:
+        ReceiverType = ""
+      )
       FunctionName =  ""
       Signature =  ""
       Block =  ""
@@ -74,17 +76,62 @@ CodeGenTransform:
 
   !view ValidChoice(input <: string) -> Statement:
     input -> (:
-      VarDecl = name -> <VarDecl> (:
-        identifier = name
+      VarDecl = input -> <VarDecl> (:
+        identifier = input
         TypeName = typeName
       )
     )
 
   !view InvalidChoice(input <: string) -> Statement:
     input -> (:
-      Foo = name -> <Foo> (:
+      Foo = input -> <Foo> (:
         let f = "b"
       )
+
+      let Bar = ""
+    )
+
+  !view Relational(input <: string) -> RelationalType:
+    input -> (:
+      Foo = input -> <Foo> (:
+        let f = "b"
+      )
+    )
+
+  !view InnerRelational(input <: string) -> MethodSpec:
+    input -> (:
+      let foo = input -> <RelationalType> (:
+        bar = input -> <RelationalType> (:
+          bar = ""
+        )
+      )
+
+      MethodName = ""
+      Signature = ""
+    )
+
+  !view TransformVarValid(input <: string) -> Statement:
+    input -> (:
+      let varDeclaration = input -> <VarDecl> (:
+        identifier = ""
+        TypeName = ""
+      )
+      let varDeclaration = input -> <VarDecl> (:
+        identifier = ""
+        TypeName = ""
+      )
+
+      VarDecl = varDeclaration
+    )
+
+  !view TransformVarInvalid(input <: string) -> Statement:
+    input -> (:
+      let varDeclaration = input -> <VarDecl> (:
+        foo = ""
+        TypeName = ""
+      )
+
+      VarDecl = varDeclaration
     )
 
   !view ValidChoiceCombination(input <: string) -> MethodSpec:
@@ -127,7 +174,9 @@ CodeGenTransform:
         let upper = "bar"
       )
       transformTypeRef = input -> <Statement> (:
-        let upper = "bar"
+        VarDecl = input -> <VarDecl> (:
+          let upper = "bar"
+        )
       )
       unaryResultValidBool = !true
       unaryResultValidInt = -5
