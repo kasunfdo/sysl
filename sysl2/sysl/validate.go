@@ -5,10 +5,15 @@ import (
 	"fmt"
 	"strings"
 
-	sysl "github.com/anz-bank/sysl/src/proto"
+	"github.com/anz-bank/sysl/src/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+type TypeData struct {
+	refType *sysl.Type
+	tuple *sysl.Type
+}
 
 type Validator struct {
 	grammar     *sysl.Application
@@ -261,15 +266,23 @@ func (r *Resolver) resolveExprType(expr *sysl.Expr, viewName string, scope strin
 			case *sysl.Expr_Transform_Stmt_Assign_:
 				varName := s.Assign.GetName()
 
-				expr := s.Assign.GetExpr()
-				exprType := r.resolveExprType(expr, viewName, scope+":"+varName, typeName)
-				attrDefs[varName] = exprType
-				r.assignTypes[viewName] = map[string]*sysl.Type{typeName: newType}
+				if _, exists := attrDefs[varName]; exists {
+					r.messages = append(r.messages, *NewMsg(ErrRedefined, []string{scope, varName}))
+				}else{
+					exprType := r.resolveExprType(s.Assign.GetExpr(), viewName, scope+":"+varName, typeName)
+					attrDefs[varName] = exprType
+					r.assignTypes[viewName] = map[string]*sysl.Type{typeName: newType}
+
+				}
 			case *sysl.Expr_Transform_Stmt_Let:
 				varName := s.Let.GetName()
-				expr := s.Let.GetExpr()
-				exprType := r.resolveExprType(expr, viewName, scope+":"+varName, typeName)
-				r.varTypes[scope+":"+varName] = map[string]*sysl.Type{getTypeName(s.Let.GetExpr().GetType()): exprType}
+				typeName := getTypeName(s.Let.GetExpr().GetType())
+				if _, exists := r.varTypes[scope+":"+varName]; exists {
+					r.messages = append(r.messages, *NewMsg(ErrRedefined, []string{scope, varName}))
+				} else {
+					exprType := r.resolveExprType(s.Let.GetExpr(), viewName, scope+":"+varName, typeName)
+					r.varTypes[scope+":"+varName] = map[string]*sysl.Type{typeName: exprType}
+				}
 			}
 		}
 		return newType
@@ -293,6 +306,10 @@ func (r *Resolver) resolveExprType(expr *sysl.Expr, viewName string, scope strin
 
 			return typeInt()
 		}
+	}
+
+	if expr.Type != nil {
+		return expr.Type
 	}
 
 	return typeNone()

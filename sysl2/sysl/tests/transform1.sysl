@@ -116,12 +116,49 @@ CodeGenTransform:
         identifier = ""
         TypeName = ""
       )
+
+      VarDecl = varDeclaration
+    )
+
+  !view TransformVarRedefined(input <: string) -> Statement:
+    input -> (:
+      let varDeclaration = input -> <VarDecl> (:
+        identifier = ""
+        TypeName = ""
+      )
       let varDeclaration = input -> <VarDecl> (:
         identifier = ""
         TypeName = ""
       )
 
       VarDecl = varDeclaration
+    )
+
+  !view TransformInnerVarRedefined(input <: string) -> Statement:
+    input -> (:
+      let varDeclaration = input -> <VarDecl> (:
+        identifier = ""
+        TypeName = ""
+        let foo = ""
+        let foo = ""
+      )
+
+      VarDecl = varDeclaration
+    )
+
+  !view TransformAssignRedefined(input <: string) -> Statement:
+    input -> (:
+      VarDecl = varDeclaration
+      VarDecl = varDeclaration
+    )
+
+  !view TransformInnerAssignRedefined(input <: string) -> Statement:
+    input -> (:
+      VarDecl = input -> <VarDecl> (:
+        identifier = ""
+        TypeName = ""
+        TypeName = ""
+      )
     )
 
   !view TransformVarInvalid(input <: string) -> Statement:

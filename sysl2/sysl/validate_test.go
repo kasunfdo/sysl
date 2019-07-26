@@ -4,7 +4,7 @@ import (
 	"flag"
 	"testing"
 
-	sysl "github.com/anz-bank/sysl/src/proto"
+	"github.com/anz-bank/sysl/src/proto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -483,6 +483,18 @@ func TestValidatorValidateViews(t *testing.T) {
 		"Transform variable valid": {
 			input:    map[string]*sysl.View{"TransformVarValid": tfmViews["TransformVarValid"]},
 			expected: nil},
+		"Transform variable redefined": {
+			input:    map[string]*sysl.View{"TransformVarRedefined": tfmViews["TransformVarRedefined"]},
+			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformVarRedefined", "varDeclaration"}}}},
+		"Transform inner-variable redefined": {
+			input:    map[string]*sysl.View{"TransformInnerVarRedefined": tfmViews["TransformInnerVarRedefined"]},
+			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformInnerVarRedefined:varDeclaration", "foo"}}}},
+		"Transform assign redefined": {
+			input:    map[string]*sysl.View{"TransformAssignRedefined": tfmViews["TransformAssignRedefined"]},
+			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformAssignRedefined", "VarDecl"}}}},
+		"Transform inner-assign redefined": {
+			input:    map[string]*sysl.View{"TransformInnerAssignRedefined": tfmViews["TransformInnerAssignRedefined"]},
+			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformInnerAssignRedefined:VarDecl", "TypeName"}}}},
 		"Transform variable invalid": {
 			input: map[string]*sysl.View{"TransformVarInvalid": tfmViews["TransformVarInvalid"]},
 			expected: []Msg{
@@ -600,6 +612,10 @@ func TestValidatorValidate(t *testing.T) {
 	validator := NewValidator(grammar, transform)
 	validator.Validate("goFile")
 	actual := validator.GetMessages()
+	if actual!=nil{
+	for _,g:=range actual{
+		g.logMsg()
+	}}
 	assert.Nil(t, actual, "Unexpected result")
 }
 

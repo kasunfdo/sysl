@@ -32,6 +32,7 @@ const (
 	ErrExcessAttr              = 406
 	ErrInvalidOption           = 407
 	ErrInvalidUnary            = 408
+	ErrRedefined               = 409
 
 	WarnValidatedWithWarn = 300
 
@@ -50,6 +51,7 @@ var (
 		ErrExcessAttr:              "Excess Attribute (%s), defined in View (%s), having return Type (%s)",
 		ErrInvalidOption:           "In View %s, (%s) does not match any of the options for return Type (%s)",
 		ErrInvalidUnary:            "In view (%s), unary operator used with invalid type: (%s)",
+		ErrRedefined:               "In view (%s), (%s) is already defined",
 
 		WarnValidatedWithWarn: "Validated with warnings",
 
@@ -66,6 +68,7 @@ var (
 		ErrExcessAttr:              ERROR,
 		ErrInvalidOption:           ERROR,
 		ErrInvalidUnary:            ERROR,
+		ErrRedefined:               ERROR,
 
 		WarnValidatedWithWarn: WARN,
 
