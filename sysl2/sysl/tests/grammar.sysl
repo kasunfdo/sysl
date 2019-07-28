@@ -50,3 +50,14 @@ Go:
 
   !table RelationalType:
     Foo <: string
+
+  !type DeclareAndAssignStmt:
+    Variables <: string
+    Expression <: Expression
+
+  !union __Choice_Expression:
+    FunctionCall
+    ValueExpr
+
+  !type Expression:
+    __Choice_Expression <: __Choice_Expression

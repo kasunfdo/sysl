@@ -103,17 +103,16 @@ func TestValidatorIsCollectionType(t *testing.T) {
 
 func TestValidatorValidateEntryPoint(t *testing.T) {
 	start := "EntryPoint"
-	transform, _ := loadAndGetDefaultApp("tests", "transform1.sysl")
+	p := NewParser()
+	transform, _ := loadTransform("tests", "transform1.sysl", p)
 
 	var entryPointView *sysl.View
 	var nonEntryPointView *sysl.View
 	var invalidEntryPointView *sysl.View
 
-	for _, tfm := range transform.GetApps() {
-		entryPointView = tfm.Views[start]
-		nonEntryPointView = tfm.Views["TfmDefaultEmpty"]
-		invalidEntryPointView = tfm.Views["EntryPointInvalid"]
-	}
+	entryPointView = transform.Views[start]
+	nonEntryPointView = transform.Views["TfmDefaultEmpty"]
+	invalidEntryPointView = transform.Views["EntryPointInvalid"]
 
 	cases := map[string]struct {
 		input    *sysl.Application
@@ -140,7 +139,7 @@ func TestValidatorValidateEntryPoint(t *testing.T) {
 		input := test.input
 		expected := test.expected
 		t.Run(name, func(t *testing.T) {
-			validator := NewValidator(nil, input)
+			validator := NewValidator(nil, input, p.InferredAssigns(), p.InferredLets())
 			validator.validateEntryPoint(start)
 			actual := validator.GetMessages()
 			assert.Equal(t, expected, actual, "Unexpected result")
@@ -150,7 +149,8 @@ func TestValidatorValidateEntryPoint(t *testing.T) {
 
 func TestValidatorValidateFileName(t *testing.T) {
 	viewName := "filename"
-	transform, _ := loadAndGetDefaultApp("tests", "transform1.sysl")
+	p := NewParser()
+	transform, _ := loadTransform("tests", "transform1.sysl", p)
 
 	var fileNameView *sysl.View
 	var nonFileNameView *sysl.View
@@ -158,13 +158,11 @@ func TestValidatorValidateFileName(t *testing.T) {
 	var invalidFileNameView2 *sysl.View
 	var invalidFileNameView3 *sysl.View
 
-	for _, tfm := range transform.GetApps() {
-		fileNameView = tfm.Views[viewName]
-		nonFileNameView = tfm.Views["TfmDefaultEmpty"]
-		invalidFileNameView1 = tfm.Views["TfmFilenameInvalid1"]
-		invalidFileNameView2 = tfm.Views["TfmFilenameInvalid2"]
-		invalidFileNameView3 = tfm.Views["TfmFilenameInvalid3"]
-	}
+	fileNameView = transform.Views[viewName]
+	nonFileNameView = transform.Views["TfmDefaultEmpty"]
+	invalidFileNameView1 = transform.Views["TfmFilenameInvalid1"]
+	invalidFileNameView2 = transform.Views["TfmFilenameInvalid2"]
+	invalidFileNameView3 = transform.Views["TfmFilenameInvalid3"]
 
 	cases := map[string]struct {
 		input    *sysl.Application
@@ -193,7 +191,7 @@ func TestValidatorValidateFileName(t *testing.T) {
 		input := test.input
 		expected := test.expected
 		t.Run(name, func(t *testing.T) {
-			validator := NewValidator(nil, input)
+			validator := NewValidator(nil, input, p.InferredAssigns(), p.InferredLets())
 			validator.validateFileName()
 			actual := validator.GetMessages()
 			assert.Equal(t, expected, actual, "Unexpected result")
@@ -357,6 +355,7 @@ func TestValidatorHasSameType(t *testing.T) {
 	}
 }
 
+/*
 func TestValidatorResolveExprType(t *testing.T) {
 	type inputData struct {
 		viewName string
@@ -434,79 +433,93 @@ func TestValidatorResolveExprType(t *testing.T) {
 		expected := test.expected
 		t.Run(name, func(t *testing.T) {
 			resolver := NewResolver(nil)
-			syslType := resolver.resolveExprType(input.expr, input.viewName, "", "")
+			syslType := resolver.resolveExprType(input.expr, input.viewName, "", nil)
 			messages := resolver.GetMessages()
 			assert.True(t, hasSameType(expected.syslType, syslType), "Unexpected result")
 			assert.Equal(t, expected.messages, messages, "Unexpected result")
 		})
 	}
-}
+}*/
 
 func TestValidatorValidateViews(t *testing.T) {
-	transformModule, tfmAppName := loadAndGetDefaultApp("tests", "transform1.sysl")
-	grammarModule, grammarAppName := loadAndGetDefaultApp("tests", "grammar.sysl")
-
-	grammar := grammarModule.GetApps()[grammarAppName]
-	tfmViews := transformModule.GetApps()[tfmAppName].GetViews()
+	p := NewParser()
+	transform, _ := loadTransform("tests", "transform1.sysl", p)
+	grammar, _ := loadGrammar("tests/grammar.sysl")
 
 	cases := map[string]struct {
-		input    map[string]*sysl.View
-		expected []Msg
+		inputAssign map[string]TypeData
+		inputLet    map[string]TypeData
+		expected    []Msg
 	}{
 		"Equal": {
-			input:    map[string]*sysl.View{"TfmValid": tfmViews["TfmValid"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"TfmValid": p.InferredAssigns()["TfmValid"]},
+			inputLet:    map[string]TypeData{"TfmValid": p.InferredLets()["TfmValid"]},
+			expected:    nil},
 		"Not Equal": {
-			input: map[string]*sysl.View{"TfmInvalid": tfmViews["TfmInvalid"]},
+			inputAssign: map[string]TypeData{"TfmInvalid": p.InferredAssigns()["TfmInvalid"]},
+			inputLet:    map[string]TypeData{"TfmInvalid": p.InferredLets()["TfmInvalid"]},
 			expected: []Msg{
 				{MessageID: ErrMissingReqField, MessageData: []string{"FunctionName", "TfmInvalid", "MethodDecl"}}}},
 		"Absent optional": {
-			input:    map[string]*sysl.View{"TfmNoOptional": tfmViews["TfmNoOptional"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"TfmNoOptional": p.InferredAssigns()["TfmNoOptional"]},
+			inputLet:    map[string]TypeData{"TfmNoOptional": p.InferredLets()["TfmNoOptional"]},
+			expected:    nil},
 		"Excess attributes without optionals": {
-			input: map[string]*sysl.View{"TfmExcessAttrs1": tfmViews["TfmExcessAttrs1"]},
+			inputAssign: map[string]TypeData{"TfmExcessAttrs1": p.InferredAssigns()["TfmExcessAttrs1"]},
+			inputLet:    map[string]TypeData{"TfmExcessAttrs1": p.InferredLets()["TfmExcessAttrs1"]},
 			expected: []Msg{
 				{MessageID: ErrExcessAttr, MessageData: []string{"ExcessAttr1", "TfmExcessAttrs1", "MethodDecl"}}}},
 		"Excess attributes with optionals": {
-			input: map[string]*sysl.View{"TfmExcessAttrs2": tfmViews["TfmExcessAttrs2"]},
+			inputAssign: map[string]TypeData{"TfmExcessAttrs2": p.InferredAssigns()["TfmExcessAttrs2"]},
+			inputLet:    map[string]TypeData{"TfmExcessAttrs2": p.InferredLets()["TfmExcessAttrs2"]},
 			expected: []Msg{
 				{MessageID: ErrExcessAttr, MessageData: []string{"ExcessAttr1", "TfmExcessAttrs2", "MethodDecl"}}}},
 		"Valid choice": {
-			input:    map[string]*sysl.View{"ValidChoice": tfmViews["ValidChoice"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"ValidChoice": p.InferredAssigns()["ValidChoice"]},
+			inputLet:    map[string]TypeData{"ValidChoice": p.InferredLets()["ValidChoice"]},
+			expected:    nil},
 		"Relational Type": {
-			input:    map[string]*sysl.View{"Relational": tfmViews["Relational"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"Relational": p.InferredAssigns()["Relational"]},
+			inputLet:    map[string]TypeData{"Relational": p.InferredLets()["Relational"]},
+			expected:    nil},
 		"Inner relational Type": {
-			input:    map[string]*sysl.View{"InnerRelational": tfmViews["InnerRelational"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"InnerRelational": p.InferredAssigns()["InnerRelational"]},
+			inputLet:    map[string]TypeData{"InnerRelational": p.InferredLets()["InnerRelational"]},
+			expected:    nil},
 		"Transform variable valid": {
-			input:    map[string]*sysl.View{"TransformVarValid": tfmViews["TransformVarValid"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"TransformVarValid": p.InferredAssigns()["TransformVarValid"]},
+			inputLet:    map[string]TypeData{"TransformVarValid": p.InferredLets()["TransformVarValid"]},
+			expected:    nil},
 		"Transform variable redefined": {
-			input:    map[string]*sysl.View{"TransformVarRedefined": tfmViews["TransformVarRedefined"]},
-			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformVarRedefined", "varDeclaration"}}}},
+			inputAssign: map[string]TypeData{"TransformVarRedefined": p.InferredAssigns()["TransformVarRedefined"]},
+			inputLet:    map[string]TypeData{"TransformVarRedefined": p.InferredLets()["TransformVarRedefined"]},
+			expected:    []Msg{{MessageID: 409, MessageData: []string{"TransformVarRedefined", "varDeclaration"}}}},
 		"Transform inner-variable redefined": {
-			input:    map[string]*sysl.View{"TransformInnerVarRedefined": tfmViews["TransformInnerVarRedefined"]},
-			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformInnerVarRedefined:varDeclaration", "foo"}}}},
+			inputAssign: map[string]TypeData{"TransformInnerVarRedefined": p.InferredAssigns()["TransformInnerVarRedefined"]},
+			inputLet:    map[string]TypeData{"TransformInnerVarRedefined": p.InferredLets()["TransformInnerVarRedefined"]},
+			expected:    []Msg{{MessageID: 409, MessageData: []string{"TransformInnerVarRedefined:varDeclaration", "foo"}}}},
 		"Transform assign redefined": {
-			input:    map[string]*sysl.View{"TransformAssignRedefined": tfmViews["TransformAssignRedefined"]},
-			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformAssignRedefined", "VarDecl"}}}},
+			inputAssign: map[string]TypeData{"TransformAssignRedefined": p.InferredAssigns()["TransformAssignRedefined"]},
+			inputLet:    map[string]TypeData{"TransformAssignRedefined": p.InferredLets()["TransformAssignRedefined"]},
+			expected:    []Msg{{MessageID: 409, MessageData: []string{"TransformAssignRedefined", "VarDecl"}}}},
 		"Transform inner-assign redefined": {
-			input:    map[string]*sysl.View{"TransformInnerAssignRedefined": tfmViews["TransformInnerAssignRedefined"]},
-			expected: []Msg{{MessageID: 409, MessageData: []string{"TransformInnerAssignRedefined:VarDecl", "TypeName"}}}},
+			inputAssign: map[string]TypeData{"TransformInnerAssignRedefined": p.InferredAssigns()["TransformInnerAssignRedefined"]},
+			inputLet:    map[string]TypeData{"TransformInnerAssignRedefined": p.InferredLets()["TransformInnerAssignRedefined"]},
+			expected:    []Msg{{MessageID: 409, MessageData: []string{"TransformInnerAssignRedefined:VarDecl", "TypeName"}}}},
 		"Transform variable invalid": {
-			input: map[string]*sysl.View{"TransformVarInvalid": tfmViews["TransformVarInvalid"]},
+			inputAssign: map[string]TypeData{"TransformVarInvalid": p.InferredAssigns()["TransformVarInvalid"]},
+			inputLet:    map[string]TypeData{"TransformVarInvalid": p.InferredLets()["TransformVarInvalid"]},
 			expected: []Msg{
 				{MessageID: 405, MessageData: []string{"identifier", "TransformVarInvalid:varDeclaration", "VarDecl"}},
 				{MessageID: 406, MessageData: []string{"foo", "TransformVarInvalid:varDeclaration", "VarDecl"}}}},
 	}
 
 	for name, test := range cases {
-		input := test.input
+		inputAssign := test.inputAssign
+		inputLet := test.inputLet
 		expected := test.expected
 		t.Run(name, func(t *testing.T) {
-			validator := NewValidator(grammar, &sysl.Application{Views: input})
+			validator := NewValidator(grammar, transform, inputAssign, inputLet)
 			validator.validateViews()
 			actual := validator.GetMessages()
 			assert.Equal(t, expected, actual, "Unexpected result")
@@ -515,30 +528,32 @@ func TestValidatorValidateViews(t *testing.T) {
 }
 
 func TestValidatorValidateViewsInnerTypes(t *testing.T) {
-	transformModule, tfmAppName := loadAndGetDefaultApp("tests", "transform1.sysl")
-	grammarModule, grammarAppName := loadAndGetDefaultApp("tests", "grammar.sysl")
-
-	grammar := grammarModule.GetApps()[grammarAppName]
-	tfmViews := transformModule.GetApps()[tfmAppName].GetViews()
+	p := NewParser()
+	transform, _ := loadTransform("tests", "transform1.sysl", p)
+	grammar, _ := loadGrammar("tests/grammar.sysl")
 
 	cases := map[string]struct {
-		input    map[string]*sysl.View
-		expected []Msg
+		inputAssign map[string]TypeData
+		inputLet    map[string]TypeData
+		expected    []Msg
 	}{
 		"Valid inner type": {
-			input:    map[string]*sysl.View{"ValidInnerAttrs": tfmViews["ValidInnerAttrs"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"ValidInnerAttrs": p.InferredAssigns()["ValidInnerAttrs"]},
+			inputLet:    map[string]TypeData{"ValidInnerAttrs": p.InferredLets()["ValidInnerAttrs"]},
+			expected:    nil},
 		"Invalid inner type": {
-			input: map[string]*sysl.View{"InvalidInnerAttrs": tfmViews["InvalidInnerAttrs"]},
+			inputAssign: map[string]TypeData{"InvalidInnerAttrs": p.InferredAssigns()["InvalidInnerAttrs"]},
+			inputLet:    map[string]TypeData{"InvalidInnerAttrs": p.InferredLets()["InvalidInnerAttrs"]},
 			expected: []Msg{
 				{MessageID: ErrMissingReqField, MessageData: []string{"PackageName", "InvalidInnerAttrs", "PackageClause"}},
 				{MessageID: ErrExcessAttr, MessageData: []string{"Foo", "InvalidInnerAttrs", "PackageClause"}}}},
 	}
 	for name, test := range cases {
-		input := test.input
+		inputAssign := test.inputAssign
+		inputLet := test.inputLet
 		expected := test.expected
 		t.Run(name, func(t *testing.T) {
-			validator := NewValidator(grammar, &sysl.Application{Views: input})
+			validator := NewValidator(grammar, transform, inputAssign, inputLet)
 			validator.validateViews()
 			actual := validator.GetMessages()
 			assert.Equal(t, expected, actual, "Unexpected result")
@@ -547,42 +562,48 @@ func TestValidatorValidateViewsInnerTypes(t *testing.T) {
 }
 
 func TestValidatorValidateViewsChoiceTypes(t *testing.T) {
-	transformModule, tfmAppName := loadAndGetDefaultApp("tests", "transform1.sysl")
-	grammarModule, grammarAppName := loadAndGetDefaultApp("tests", "grammar.sysl")
-
-	grammar := grammarModule.GetApps()[grammarAppName]
-	tfmViews := transformModule.GetApps()[tfmAppName].GetViews()
+	p := NewParser()
+	transform, _ := loadTransform("tests", "transform1.sysl", p)
+	grammar, _ := loadGrammar("tests/grammar.sysl")
 
 	cases := map[string]struct {
-		input    map[string]*sysl.View
-		expected []Msg
+		inputAssign map[string]TypeData
+		inputLet    map[string]TypeData
+		expected    []Msg
 	}{
 		"Valid choice": {
-			input:    map[string]*sysl.View{"ValidChoice": tfmViews["ValidChoice"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"ValidChoice": p.InferredAssigns()["ValidChoice"]},
+			inputLet:    map[string]TypeData{"ValidChoice": p.InferredLets()["ValidChoice"]},
+			expected:    nil},
 		"Invalid choice": {
-			input: map[string]*sysl.View{"InvalidChoice": tfmViews["InvalidChoice"]},
+			inputAssign: map[string]TypeData{"InvalidChoice": p.InferredAssigns()["InvalidChoice"]},
+			inputLet:    map[string]TypeData{"InvalidChoice": p.InferredLets()["InvalidChoice"]},
 			expected: []Msg{
 				{MessageID: ErrInvalidOption, MessageData: []string{"InvalidChoice", "Foo", "Statement"}},
 				{MessageID: ErrExcessAttr, MessageData: []string{"Foo", "InvalidChoice", "Statement"}}}},
 		"Valid choice combination": {
-			input:    map[string]*sysl.View{"ValidChoiceCombination": tfmViews["ValidChoiceCombination"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"ValidChoiceCombination": p.InferredAssigns()["ValidChoiceCombination"]},
+			inputLet:    map[string]TypeData{"ValidChoiceCombination": p.InferredLets()["ValidChoiceCombination"]},
+			expected:    nil},
 		"Valid choice non-combination": {
-			input:    map[string]*sysl.View{"ValidChoiceNonCombination": tfmViews["ValidChoiceNonCombination"]},
-			expected: nil},
+			inputAssign: map[string]TypeData{"ValidChoiceNonCombination": p.InferredAssigns()["ValidChoiceNonCombination"]},
+			inputLet:    map[string]TypeData{"ValidChoiceNonCombination": p.InferredLets()["ValidChoiceNonCombination"]},
+			expected:    nil},
 		"Invalid choice combination excess": {
-			input: map[string]*sysl.View{"InvalidChoiceCombinationExcess": tfmViews["InvalidChoiceCombinationExcess"]},
+			inputAssign: map[string]TypeData{"InvalidChoiceCombinationExcess": p.InferredAssigns()["InvalidChoiceCombinationExcess"]},
+			inputLet:    map[string]TypeData{"InvalidChoiceCombinationExcess": p.InferredLets()["InvalidChoiceCombinationExcess"]},
 			expected: []Msg{{
 				MessageID:   ErrExcessAttr,
 				MessageData: []string{"Foo", "InvalidChoiceCombinationExcess", "MethodSpec"}}}},
 		"Invalid choice combination missing": {
-			input: map[string]*sysl.View{"InvalidChoiceCombiMissing": tfmViews["InvalidChoiceCombiMissing"]},
+			inputAssign: map[string]TypeData{"InvalidChoiceCombiMissing": p.InferredAssigns()["InvalidChoiceCombiMissing"]},
+			inputLet:    map[string]TypeData{"InvalidChoiceCombiMissing": p.InferredLets()["InvalidChoiceCombiMissing"]},
 			expected: []Msg{
 				{MessageID: ErrMissingReqField, MessageData: []string{"Signature", "InvalidChoiceCombiMissing", "MethodSpec"}},
 				{MessageID: ErrExcessAttr, MessageData: []string{"Foo", "InvalidChoiceCombiMissing", "MethodSpec"}}}},
 		"Invalid choice non-combination missing": {
-			input: map[string]*sysl.View{"InvalidChoiceNonCombination": tfmViews["InvalidChoiceNonCombination"]},
+			inputAssign: map[string]TypeData{"InvalidChoiceNonCombination": p.InferredAssigns()["InvalidChoiceNonCombination"]},
+			inputLet:    map[string]TypeData{"InvalidChoiceNonCombination": p.InferredLets()["InvalidChoiceNonCombination"]},
 			expected: []Msg{
 				{
 					MessageID:   ErrInvalidOption,
@@ -592,10 +613,11 @@ func TestValidatorValidateViewsChoiceTypes(t *testing.T) {
 					MessageData: []string{"Interface", "InvalidChoiceNonCombination", "MethodSpec"}}}},
 	}
 	for name, test := range cases {
-		input := test.input
+		inputAssign := test.inputAssign
+		inputLet := test.inputLet
 		expected := test.expected
 		t.Run(name, func(t *testing.T) {
-			validator := NewValidator(grammar, &sysl.Application{Views: input})
+			validator := NewValidator(grammar, transform, inputAssign, inputLet)
 			validator.validateViews()
 			actual := validator.GetMessages()
 			assert.Equal(t, expected, actual, "Unexpected result")
@@ -604,29 +626,26 @@ func TestValidatorValidateViewsChoiceTypes(t *testing.T) {
 }
 
 func TestValidatorValidate(t *testing.T) {
-	transformModule, tfmAppName := loadAndGetDefaultApp("tests", "transform2.sysl")
-	grammarModule, grammarAppName := loadAndGetDefaultApp("tests", "grammar.sysl")
+	p := NewParser()
+	transform, _ := loadTransform("tests", "transform2.sysl", p)
+	grammar, _ := loadGrammar("tests/grammar.sysl")
 
-	grammar := grammarModule.GetApps()[grammarAppName]
-	transform := transformModule.GetApps()[tfmAppName]
-	validator := NewValidator(grammar, transform)
+	validator := NewValidator(grammar, transform, p.InferredAssigns(), p.InferredLets())
 	validator.Validate("goFile")
 	actual := validator.GetMessages()
-	if actual!=nil{
-	for _,g:=range actual{
-		g.logMsg()
-	}}
 	assert.Nil(t, actual, "Unexpected result")
 }
 
 func TestValidatorLoadTransformSuccess(t *testing.T) {
-	tfm, err := loadTransform("tests", "transform2.sysl")
+	p := NewParser()
+	tfm, err := loadTransform("tests", "transform2.sysl", p)
 	assert.NotNil(t, tfm, "Unexpected result")
 	assert.Nil(t, err, "Unexpected result")
 }
 
 func TestValidatorLoadTransformError(t *testing.T) {
-	tfm, err := loadTransform("foo", "bar.sysl")
+	p := NewParser()
+	tfm, err := loadTransform("foo", "bar.sysl", p)
 	assert.Nil(t, tfm, "Unexpected result")
 	assert.NotNil(t, err, "Unexpected result")
 }

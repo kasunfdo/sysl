@@ -8,14 +8,19 @@ import (
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
-	sysl "github.com/anz-bank/sysl/src/proto"
-	parser "github.com/anz-bank/sysl/sysl2/sysl/grammar"
+	"github.com/anz-bank/sysl/src/proto"
+	"github.com/anz-bank/sysl/sysl2/sysl/grammar"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+type Parser struct {
+	assignTypes map[string]TypeData
+	letTypes    map[string]TypeData
+}
+
 // Parse parses a Sysl file under a specified root.
-func Parse(filename string, root string) (*sysl.Module, error) {
+func (p *Parser) Parse(filename string, root string) (*sysl.Module, error) {
 	if root == "" {
 		root = "."
 	}
@@ -23,11 +28,11 @@ func Parse(filename string, root string) (*sysl.Module, error) {
 		return nil, exitf(ImportError, "root directory does not exist")
 	}
 	root, _ = filepath.Abs(root)
-	return FSParse(filename, http.Dir(root))
+	return p.FSParse(filename, http.Dir(root))
 }
 
 // FSParse ...
-func FSParse(filename string, fs http.FileSystem) (*sysl.Module, error) {
+func (p *Parser) FSParse(filename string, fs http.FileSystem) (*sysl.Module, error) {
 	if !strings.HasSuffix(filename, ".sysl") {
 		filename += ".sysl"
 	}
@@ -77,7 +82,7 @@ func FSParse(filename string, fs http.FileSystem) (*sysl.Module, error) {
 		}
 	}
 
-	postProcess(listener.module)
+	p.postProcess(listener.module)
 	return listener.module, nil
 }
 
@@ -234,7 +239,7 @@ func checkEndpointCalls(mod *sysl.Module) bool {
 }
 
 // for nested transform's Type
-func inferExprType(mod *sysl.Module,
+func (p *Parser) inferExprType(mod *sysl.Module,
 	appName string,
 	expr *sysl.Expr, top bool,
 	anonCount int) (*sysl.Type, int) {
@@ -243,9 +248,9 @@ func inferExprType(mod *sysl.Module,
 	case *sysl.Expr_Transform_:
 		for _, stmt := range t.Transform.Stmt {
 			if stmt.GetLet() != nil {
-				_, anonCount = inferExprType(mod, appName, stmt.GetLet().Expr, false, anonCount)
+				_, anonCount = p.inferExprType(mod, appName, stmt.GetLet().Expr, false, anonCount)
 			} else if stmt.GetAssign() != nil {
-				_, anonCount = inferExprType(mod, appName, stmt.GetAssign().Expr, false, anonCount)
+				_, anonCount = p.inferExprType(mod, appName, stmt.GetAssign().Expr, false, anonCount)
 			}
 		}
 
@@ -322,7 +327,7 @@ func inferExprType(mod *sysl.Module,
 	case *sysl.Expr_Relexpr:
 		if t.Relexpr.Op == sysl.Expr_RelExpr_RANK {
 			if !top && expr.Type == nil {
-				type1, c := inferExprType(mod, appName, t.Relexpr.Target, true, anonCount)
+				type1, c := p.inferExprType(mod, appName, t.Relexpr.Target, true, anonCount)
 				anonCount = c
 				logrus.Printf(type1.String())
 			}
@@ -330,28 +335,28 @@ func inferExprType(mod *sysl.Module,
 	case *sysl.Expr_Literal:
 		expr.Type = valueTypeToSysl(t.Literal)
 	case *sysl.Expr_List_:
-		expr.Type, _ = inferExprType(mod, appName, t.List.Expr[0], true, anonCount)
+		expr.Type, _ = p.inferExprType(mod, appName, t.List.Expr[0], true, anonCount)
 	case *sysl.Expr_Ifelse:
-		exprTypeIfTrue, _ := inferExprType(mod, appName, t.Ifelse.GetIfTrue(), true, anonCount)
+		exprTypeIfTrue, _ := p.inferExprType(mod, appName, t.Ifelse.GetIfTrue(), true, anonCount)
 		expr.Type = exprTypeIfTrue
 		if t.Ifelse.GetIfFalse() != nil {
-			exprTypeIfFalse, _ := inferExprType(mod, appName, t.Ifelse.GetIfFalse(), true, anonCount)
+			exprTypeIfFalse, _ := p.inferExprType(mod, appName, t.Ifelse.GetIfFalse(), true, anonCount)
 			// TODO if exprTypeIfTrue != exprTypeIfFalse, raise an error. Then remove following 3 lines
 			if exprTypeIfFalse != nil {
 				expr.Type = exprTypeIfFalse
 			}
 		}
 	case *sysl.Expr_Binexpr:
-		exprTypeLHS, _ := inferExprType(mod, appName, t.Binexpr.GetLhs(), true, anonCount)
+		exprTypeLHS, _ := p.inferExprType(mod, appName, t.Binexpr.GetLhs(), true, anonCount)
 		expr.Type = exprTypeLHS
-		exprTypeRHS, _ := inferExprType(mod, appName, t.Binexpr.GetRhs(), true, anonCount)
+		exprTypeRHS, _ := p.inferExprType(mod, appName, t.Binexpr.GetRhs(), true, anonCount)
 		// TODO if exprTypeRHS != exprTypeLHS, raise an error. Then remove following 3 lines
 		if exprTypeRHS != nil {
 			expr.Type = exprTypeRHS
 		}
 
 	case *sysl.Expr_Unexpr:
-		expr.Type, _ = inferExprType(mod, appName, expr.GetUnexpr().GetArg(), true, anonCount)
+		expr.Type, _ = p.inferExprType(mod, appName, expr.GetUnexpr().GetArg(), true, anonCount)
 
 	default:
 		// TODO Handle expression
@@ -361,16 +366,16 @@ func inferExprType(mod *sysl.Module,
 	return expr.Type, anonCount
 }
 
-func inferTypes(mod *sysl.Module, appName string) {
+func (p *Parser) inferTypes(mod *sysl.Module, appName string) {
 	for _, view := range mod.Apps[appName].Views {
 		if HasPattern(view.Attrs, "abstract") {
 			continue
 		}
-		inferExprType(mod, appName, view.Expr, true, 0)
+		p.inferExprType(mod, appName, view.Expr, true, 0)
 	}
 }
 
-func postProcess(mod *sysl.Module) {
+func (p *Parser) postProcess(mod *sysl.Module) {
 	appNames := make([]string, 0, len(mod.Apps))
 	for a := range mod.Apps {
 		appNames = append(appNames, a)
@@ -461,7 +466,7 @@ func postProcess(mod *sysl.Module) {
 				}
 			}
 		}
-		inferTypes(mod, appName)
+		p.inferTypes(mod, appName)
 		collectorPubSubCalls(appName, app)
 	}
 	checkEndpointCalls(mod)
@@ -510,4 +515,18 @@ func valueTypeToSysl(value *sysl.Value) *sysl.Type {
 		panic(errors.Errorf("valueTypeToSysl: unhandled type: %v", value))
 
 	}
+}
+
+func (p *Parser) InferredAssigns() map[string]TypeData {
+	return p.assignTypes
+}
+
+func (p *Parser) InferredLets() map[string]TypeData {
+	return p.letTypes
+}
+
+func NewParser() *Parser {
+	return &Parser{
+		assignTypes: map[string]TypeData{},
+		letTypes:    map[string]TypeData{}}
 }

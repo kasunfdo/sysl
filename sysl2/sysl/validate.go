@@ -12,21 +12,14 @@ import (
 
 type TypeData struct {
 	refType *sysl.Type
-	tuple *sysl.Type
+	tuple   *sysl.Type
 }
 
 type Validator struct {
 	grammar     *sysl.Application
 	transform   *sysl.Application
-	assignTypes map[string]map[string]*sysl.Type
-	varTypes    map[string]map[string]*sysl.Type
-	messages    []Msg
-}
-
-type Resolver struct {
-	transform   *sysl.Application
-	assignTypes map[string]map[string]*sysl.Type
-	varTypes    map[string]map[string]*sysl.Type
+	assignTypes map[string]TypeData
+	letTypes    map[string]TypeData
 	messages    []Msg
 }
 
@@ -50,12 +43,13 @@ func DoValidate(flags *flag.FlagSet, args []string) error {
 		return err
 	}
 
-	transform, err := loadTransform(*rootTransform, *transformFile)
+	p := NewParser()
+	transform, err := loadTransform(*rootTransform, *transformFile, p)
 	if err != nil {
 		return err
 	}
 
-	validator := NewValidator(grammar, transform)
+	validator := NewValidator(grammar, transform, p.InferredAssigns(), p.InferredLets())
 	validator.Validate(*start)
 
 	for _, message := range validator.GetMessages() {
@@ -118,39 +112,39 @@ func (v *Validator) validateFileName() {
 }
 
 func (v *Validator) validateViews() {
-	resolver := NewResolver(v.transform)
-	resolver.ResolveAllViews()
-	v.assignTypes = resolver.getResolvedAssigns()
-	v.varTypes = resolver.getResolvedVars()
-	v.messages = append(v.messages, resolver.GetMessages()...)
+	// resolver := NewResolver(v.transform)
+	// resolver.ResolveAllViews()
+	// v.assignTypes = resolver.getResolvedAssigns()
+	// v.letTypes = resolver.getResolvedVars()
+	// v.messages = append(v.messages, resolver.GetMessages()...)
 
 	for viewName, resolvedTypes := range v.assignTypes {
-		for typeName, resolvedType := range resolvedTypes {
-			if grammarType, exists := v.grammar.Types[typeName]; exists {
-				switch t := grammarType.Type.(type) {
-				case *sysl.Type_Tuple_:
-					v.compareTuple(t.Tuple, resolvedType.GetTuple(),
-						getAttrNames(resolvedType.GetTuple().GetAttrDefs()), viewName, typeName)
-				default:
-					fmt.Println("[validate.validateViews] Unhandled grammar type")
-				}
-
+		typeName := getTypeName(resolvedTypes.refType)
+		resolvedType := resolvedTypes.tuple
+		if grammarType, exists := v.grammar.Types[typeName]; exists {
+			switch t := grammarType.Type.(type) {
+			case *sysl.Type_Tuple_:
+				v.compareTuple(t.Tuple, resolvedType.GetTuple(),
+					getAttrNames(resolvedType.GetTuple().GetAttrDefs()), viewName, typeName)
+			default:
+				fmt.Println("[validate.validateViews] Unhandled grammar type")
 			}
+
 		}
 	}
 
-	for viewName, resolvedTypes := range v.varTypes {
-		for typeName, resolvedType := range resolvedTypes {
-			if grammarType, exists := v.grammar.Types[typeName]; exists {
-				switch t := grammarType.Type.(type) {
-				case *sysl.Type_Tuple_:
-					v.compareTuple(t.Tuple, resolvedType.GetTuple(),
-						getAttrNames(resolvedType.GetTuple().GetAttrDefs()), viewName, typeName)
-				default:
-					fmt.Println("[validate.validateViews] Unhandled grammar type")
-				}
-
+	for viewName, resolvedTypes := range v.letTypes {
+		typeName := getTypeName(resolvedTypes.refType)
+		resolvedType := resolvedTypes.tuple
+		if grammarType, exists := v.grammar.Types[typeName]; exists {
+			switch t := grammarType.Type.(type) {
+			case *sysl.Type_Tuple_:
+				v.compareTuple(t.Tuple, resolvedType.GetTuple(),
+					getAttrNames(resolvedType.GetTuple().GetAttrDefs()), viewName, typeName)
+			default:
+				fmt.Println("[validate.validateViews] Unhandled grammar type")
 			}
+
 		}
 	}
 }
@@ -236,18 +230,12 @@ func (v *Validator) GetMessages() []Msg {
 	return v.messages
 }
 
-func NewValidator(grammar *sysl.Application, transform *sysl.Application) *Validator {
-	return &Validator{grammar: grammar, transform: transform}
+func NewValidator(grammar, transform *sysl.Application, assignTypes, letTypes map[string]TypeData) *Validator {
+	return &Validator{grammar: grammar, transform: transform, assignTypes: assignTypes, letTypes: letTypes}
 }
 
-func (r *Resolver) ResolveAllViews() {
-	for viewName, tfmView := range r.transform.Views {
-		typeName := getTypeName(tfmView.GetRetType())
-		r.resolveExprType(tfmView.GetExpr(), viewName, viewName, typeName)
-	}
-}
-
-func (r *Resolver) resolveExprType(expr *sysl.Expr, viewName string, scope string, typeName string) *sysl.Type {
+/*
+func (r *Resolver) resolveExprType(expr *sysl.Expr, viewName string, scope string, refType *sysl.Type) *sysl.Type {
 	switch e := expr.Expr.(type) {
 	case *sysl.Expr_Transform_:
 
@@ -268,20 +256,18 @@ func (r *Resolver) resolveExprType(expr *sysl.Expr, viewName string, scope strin
 
 				if _, exists := attrDefs[varName]; exists {
 					r.messages = append(r.messages, *NewMsg(ErrRedefined, []string{scope, varName}))
-				}else{
-					exprType := r.resolveExprType(s.Assign.GetExpr(), viewName, scope+":"+varName, typeName)
+				} else {
+					exprType := r.resolveExprType(s.Assign.GetExpr(), viewName, scope+":"+varName, refType)
 					attrDefs[varName] = exprType
-					r.assignTypes[viewName] = map[string]*sysl.Type{typeName: newType}
-
+					r.assignTypes[viewName] = TypeData{refType: refType, tuple: newType}
 				}
 			case *sysl.Expr_Transform_Stmt_Let:
 				varName := s.Let.GetName()
-				typeName := getTypeName(s.Let.GetExpr().GetType())
 				if _, exists := r.varTypes[scope+":"+varName]; exists {
 					r.messages = append(r.messages, *NewMsg(ErrRedefined, []string{scope, varName}))
 				} else {
-					exprType := r.resolveExprType(s.Let.GetExpr(), viewName, scope+":"+varName, typeName)
-					r.varTypes[scope+":"+varName] = map[string]*sysl.Type{typeName: exprType}
+					exprType := r.resolveExprType(s.Let.GetExpr(), viewName, scope+":"+varName, s.Let.GetExpr().GetType())
+					r.varTypes[scope+":"+varName] = TypeData{refType: s.Let.GetExpr().GetType(), tuple: exprType}
 				}
 			}
 		}
@@ -289,7 +275,7 @@ func (r *Resolver) resolveExprType(expr *sysl.Expr, viewName string, scope strin
 	case *sysl.Expr_Literal:
 		return expr.GetType()
 	case *sysl.Expr_Unexpr:
-		varType := r.resolveExprType(expr.GetUnexpr().GetArg(), viewName, scope, typeName)
+		varType := r.resolveExprType(expr.GetUnexpr().GetArg(), viewName, scope, refType)
 		switch e.Unexpr.GetOp() {
 		case sysl.Expr_UnExpr_NOT, sysl.Expr_UnExpr_INV:
 			if !hasSameType(varType, typeBool()) {
@@ -314,26 +300,7 @@ func (r *Resolver) resolveExprType(expr *sysl.Expr, viewName string, scope strin
 
 	return typeNone()
 }
-
-func (r *Resolver) getResolvedAssigns() map[string]map[string]*sysl.Type {
-	return r.assignTypes
-}
-
-func (r *Resolver) getResolvedVars() map[string]map[string]*sysl.Type {
-	return r.varTypes
-}
-
-func (r *Resolver) GetMessages() []Msg {
-	return r.messages
-}
-
-func NewResolver(transform *sysl.Application) *Resolver {
-	return &Resolver{
-		transform:   transform,
-		assignTypes: map[string]map[string]*sysl.Type{},
-		varTypes:    map[string]map[string]*sysl.Type{}}
-}
-
+*/
 func getTypeName(syslType *sysl.Type) string {
 	if syslType == nil {
 		return "Unknown"
@@ -402,8 +369,8 @@ func hasSameType(type1 *sysl.Type, type2 *sysl.Type) bool {
 	return false
 }
 
-func loadTransform(rootTransform, transformFile string) (*sysl.Application, error) {
-	transform, name := loadAndGetDefaultApp(rootTransform, transformFile)
+func loadTransform(rootTransform, transformFile string, p *Parser) (*sysl.Application, error) {
+	transform, name := loadAndGetDefaultApp(rootTransform, transformFile, p)
 
 	if transform == nil {
 		err := errors.New("Unable to load transform")
@@ -417,8 +384,9 @@ func loadGrammar(grammarFile string) (*sysl.Application, error) {
 	tokens := strings.Split(grammarFile, ".")
 	tokens[len(tokens)-1] = "sysl"
 	grammarSyslFile := strings.Join(tokens, ".")
+	p := NewParser()
 
-	grammar, name := loadAndGetDefaultApp("", grammarSyslFile)
+	grammar, name := loadAndGetDefaultApp("", grammarSyslFile, p)
 	if grammar == nil {
 		err := errors.New("Unable to load grammar-sysl")
 		return nil, err
