@@ -9,9 +9,13 @@ from sysl.util import writer
 class FakeLogger:
     def __init__(self):
         self.warnings = []
+        self.errors = []
 
     def warn(self, msg):
         self.warnings.append(msg)
+
+    def error(self, msg):
+        self.errors.append(msg)
 
 
 SIMPLE_SWAGGER_EXAMPLE = r"""
@@ -159,7 +163,7 @@ SWAGGER_HEADER_AND_BODY_PARAM_EXAMPLE_EXPECTED_SYSL = r"""
     /test:
         POST (createrequest <: SimpleObj [~body], key <: int [~header, ~optional, name="key"], min_date <: string [~header, ~required, name="min_date"]):
             | No description.
-            return 200
+            return
 
     #---------------------------------------------------------------------------
     # definitions
@@ -426,7 +430,7 @@ EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_201_LOCATION_HEADER_RESPONSE_EXPECT
         /goat/create-goat:
             POST ?name=string&birthday=string:
                 | Creates a goat.
-                return 201
+                return
 
     #---------------------------------------------------------------------------
     # definitions
@@ -493,7 +497,7 @@ EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_BODY_PARAMETER_EXPECTED_SYSL = r"""
         /goat/create-goat:
             POST (body <: Goat [~body]):
                 | Creates a goat.
-                return 201
+                return
 
     #---------------------------------------------------------------------------
     # definitions
@@ -543,7 +547,7 @@ EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_ERROR_RESPONSE_EXPECTED_SYSL = r"""
         /goat/status:
             GET:
                 | Check goat status
-                return 200, 500
+                return
 
     #---------------------------------------------------------------------------
     # definitions
@@ -626,7 +630,7 @@ EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_200_RESPONSE_DESCRIPTION_ONLY_EXPEC
         /goat/status:
             GET:
                 | Get goat status
-                return 200
+                return
 
     #---------------------------------------------------------------------------
     # definitions
@@ -665,10 +669,57 @@ EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_201_RESPONSE_DESCRIPTION_ONLY_EXPEC
         /goat/status:
             POST:
                 | Update goat status
-                return 201
+                return
 
     #---------------------------------------------------------------------------
     # definitions
+"""
+
+EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_MULTI_RESPONSES = r"""
+basePath: /api/v1
+
+host: goat.example.com
+
+info:
+  title: Goat CRUD API
+  version: 1.2.3
+
+definitions:
+  Goat:
+    properties:
+      name:
+        type: string
+      birthday:
+        type: string
+        format: date
+    type: object
+
+paths:
+  /goat/status:
+    post:
+      description: Update goat status
+      produces:
+        - application/json
+      responses:
+        200:
+          description: 200 OK
+          schema:
+            $ref: '#/definitions/Goat'
+        400:
+          description: Bad Request
+          schema:
+            type: string
+        401:
+          description: Unauthorized
+          schema:
+            something: somethingelse
+"""
+
+EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_MULTI_RESPONSES_EXPECTED_SYSL = r"""
+        /goat/status:
+            POST:
+                | Update goat status
+                return Goat, string, 401
 """
 
 
@@ -720,9 +771,9 @@ SWAGGER_WITH_PATH_VAR_TYPE_IN_API_EXPECTED_SYSL = r"""
     /v1:
 
         /users/{id<:int}:
-            GET ?metadata=bool? (request_id <: string [~header, ~required, name="request-id"]):
+            GET (request_id <: string [~header, ~required, name="request-id"]) ?metadata=bool?:
                 | No description.
-                return 200
+                return
 
     #---------------------------------------------------------------------------
     # definitions
@@ -779,9 +830,9 @@ SWAGGER_WITH_PATH_VAR_TYPE_IN_GLOBAL_PARAMETERS_EXPECTED_SYSL = r"""
     /v1:
 
         /users/{id<:int}:
-            GET ?metadata=bool? (request_id <: string [~header, ~required, name="request-id"]):
+            GET (request_id <: string [~header, ~required, name="request-id"]) ?metadata=bool?:
                 | No description.
-                return 200
+                return
 
     #---------------------------------------------------------------------------
     # definitions
@@ -914,6 +965,13 @@ def test_import_of_swagger_path_with_description_only_201_response():
     assert EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_201_RESPONSE_DESCRIPTION_ONLY_EXPECTED_SYSL in output
     expected_warnings = []
     assert logger.warnings == expected_warnings
+
+
+def test_import_of_swagger_path_with_multi_responses():
+    output, logger = getOutputString(EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_MULTI_RESPONSES)
+    assert EXAMPLE_SWAGGER_SPEC_WITH_ENDPOINT_PATH_WITH_MULTI_RESPONSES_EXPECTED_SYSL in output
+    expected_errors = ["Unsupported definition: {'something': 'somethingelse'}"]
+    assert logger.errors == expected_errors
 
 
 def test_parse_typespec_boolean():
