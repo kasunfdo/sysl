@@ -1,4 +1,4 @@
-package main
+package eval
 
 import (
 	"strings"
@@ -31,7 +31,7 @@ func TestEvalStrategySetup(t *testing.T) {
 }
 
 func TestScopeAddApp(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 	s := Scope{}
 	s.AddApp("app", mod.Apps[modelAppName])
 	app := s["app"].GetMap().Items
@@ -76,7 +76,7 @@ func TestScopeAddApp(t *testing.T) {
 }
 
 func TestEvalIntegerMath(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 	assert.NotNil(t, mod, "Module not loaded")
 	txApp := mod.Apps["TransformApp"]
 	viewName := "math"
@@ -97,7 +97,7 @@ func TestEvalIntegerMath(t *testing.T) {
 }
 
 func TestEvalCompare(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 	assert.NotNil(t, mod, "Module not loaded")
 	txApp := mod.Apps["TransformApp"]
 	viewName := "compare"
@@ -116,7 +116,7 @@ func TestEvalCompare(t *testing.T) {
 }
 
 func TestEvalListSetOps(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 	assert.NotNil(t, mod, "Module not loaded")
 	txApp := mod.Apps["TransformApp"]
 	viewName := "ListSetOps"
@@ -145,7 +145,7 @@ func TestEvalListSetOps(t *testing.T) {
 }
 
 func TestEvalIsKeyword(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 	assert.NotNil(t, mod, "Module not loaded")
 	txApp := mod.Apps["TransformApp"]
 	viewName := "IsKeyword"
@@ -159,7 +159,7 @@ func TestEvalIsKeyword(t *testing.T) {
 }
 
 func TestEvalIfElseAlt(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 	assert.NotNil(t, mod, "Module not loaded")
 	txApp := mod.Apps["TransformApp"]
 	viewName := "JavaType"
@@ -178,7 +178,7 @@ func TestEvalIfElseAlt(t *testing.T) {
 }
 
 func TestEvalGetAppAttributes(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[modelAppName])
@@ -231,7 +231,7 @@ func TestEvalGetAppAttributes(t *testing.T) {
 }
 
 func TestEvalNullCheckAppAttrs(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[modelAppName])
@@ -244,7 +244,7 @@ func TestEvalNullCheckAppAttrs(t *testing.T) {
 }
 
 func TestScopeAddRestApp(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 	s := Scope{}
 	s.AddApp("app", mod.Apps[todoAppName])
 	app := s["app"].GetMap().Items
@@ -296,7 +296,7 @@ func TestScopeAddRestApp(t *testing.T) {
 }
 
 func TestEvalStringOps(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[todoAppName])
@@ -339,7 +339,7 @@ func TestEvalStringOps(t *testing.T) {
 }
 
 func TestIncorrectArgsToGoFunc(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[todoAppName])
@@ -355,7 +355,7 @@ func TestIncorrectArgsToGoFunc(t *testing.T) {
 }
 
 func TestEvalFlatten(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[todoAppName])
@@ -382,7 +382,7 @@ func TestEvalFlatten(t *testing.T) {
 }
 
 func TestEvalWhere(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[modelAppName])
@@ -408,7 +408,7 @@ func TestEvalWhere(t *testing.T) {
 }
 
 func TestEvalLinks(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[modelAppName])
@@ -433,7 +433,7 @@ func TestEvalLinks(t *testing.T) {
 }
 
 func TestDotScope(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[modelAppName])
@@ -442,7 +442,7 @@ func TestDotScope(t *testing.T) {
 }
 
 func TestListOfTypeNames(t *testing.T) {
-	mod, _ := parse.Parse("tests/eval_expr.sysl", "")
+	mod, _ := parse.Parse("tests/eval_expr.sysl", "../")
 
 	s := Scope{}
 	s.AddApp("app", mod.Apps[modelAppName])
