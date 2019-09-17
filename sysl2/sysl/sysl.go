@@ -17,7 +17,15 @@ import (
 
 // Version contains the sysl binary version
 //nolint:gochecknoglobals
-var Version = "unspecified"
+var (
+	Version   = "unspecified"
+	GitCommit = "unspecified"
+	BuildDate = "unspecified"
+	GoOS      = "unspecified"
+	GoArch    = "unspecified"
+	GoVersion = "unspecified"
+	BuildOS   = "unspecified"
+)
 
 const debug string = "debug"
 
@@ -26,6 +34,7 @@ const debug string = "debug"
 func main3(args []string, fs afero.Fs, logger *logrus.Logger) error {
 	syslCmd := kingpin.New("sysl", "System Modelling Language Toolkit")
 	syslCmd.Version(Version)
+	syslCmd.Flag("info", "View binary info").Action(showBinaryInfo).Bool()
 
 	(&debugTypeData{}).add(syslCmd)
 
@@ -184,4 +193,17 @@ func generateAppargValidator(selectedCommand string, flags map[string][]string) 
 		}
 		return nil
 	}
+}
+
+//nolint:unparam
+func showBinaryInfo(_ *kingpin.ParseContext) error {
+	fmt.Printf("Version    : %s\n", Version)
+	fmt.Printf("Commit ID  : %s\n", GitCommit)
+	fmt.Printf("Build date : %s\n", BuildDate)
+	fmt.Printf("GoOS       : %s\n", GoOS)
+	fmt.Printf("GoArch     : %s\n", GoArch)
+	fmt.Printf("Golang     : %s\n", GoVersion)
+	fmt.Printf("BuildOS    : %s\n", BuildOS)
+	os.Exit(0)
+	return nil
 }
