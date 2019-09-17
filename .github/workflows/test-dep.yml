@@ -1,0 +1,17 @@
+name: Release
+on:
+  push:
+    tags:
+      - '*'
+jobs:
+
+  test-dependency:
+    name: Dependant script
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Get dependencies
+      run: |
+        sleep 20
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

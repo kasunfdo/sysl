@@ -6,6 +6,7 @@ on:
 jobs:
 
   release-sysl:
+    needs: test-dependency
     name: Release Sysl
     runs-on: ubuntu-latest
     steps:
