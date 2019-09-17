@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	sysl "github.com/anz-bank/sysl/src/proto"
@@ -16,7 +17,13 @@ import (
 
 // Version contains the sysl binary version
 //nolint:gochecknoglobals
-var Version = "unspecified"
+var (
+	Version   = "unspecified"
+	GitCommit = "unspecified"
+	BuildDate = "unspecified"
+	GoVersion = "unspecified"
+	BuildOS   = "unspecified"
+)
 
 const debug string = "debug"
 
@@ -31,6 +38,7 @@ func LoadSyslModule(root, filename string, fs afero.Fs, logger *logrus.Logger) (
 func main3(args []string, fs afero.Fs, logger *logrus.Logger) error {
 	syslCmd := kingpin.New("sysl", "System Modelling Language Toolkit")
 	syslCmd.Version(Version)
+	syslCmd.Flag("info", "View binary info").Action(showBinaryInfo).Bool()
 
 	(&debugTypeData{}).add(syslCmd)
 
@@ -105,4 +113,17 @@ func main() {
 	if rc := main2(os.Args, afero.NewOsFs(), logrus.StandardLogger(), main3); rc != 0 {
 		os.Exit(rc)
 	}
+}
+
+//nolint:unparam
+func showBinaryInfo(_ *kingpin.ParseContext) error {
+	fmt.Printf("Version    : %s\n", Version)
+	fmt.Printf("Commit ID  : %s\n", GitCommit)
+	fmt.Printf("Build date : %s\n", BuildDate)
+	fmt.Printf("GoOS       : %s\n", runtime.GOOS)
+	fmt.Printf("GoArch     : %s\n", runtime.GOARCH)
+	fmt.Printf("Golang     : %s\n", GoVersion)
+	fmt.Printf("BuildOS    : %s\n", BuildOS)
+	os.Exit(0)
+	return nil
 }
