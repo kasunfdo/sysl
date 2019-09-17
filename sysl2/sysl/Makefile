@@ -32,7 +32,9 @@ CODE_FILES = \
 	grammar/sysl_lexer.go
 
 $(EXE): $(CODE_FILES)
-	go install -v
+	$(eval GoOS=`go version | cut -d' ' -f4 | cut -d'/' -f1`)
+	$(eval GoArch=`go version | cut -d' ' -f4 | cut -d'/' -f2`)
+	go install -ldflags "-X \"main.GitCommit=`git rev-parse HEAD`\" -X \"main.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'`\" -X \"main.GoArch=${GoArch}\" -X \"main.GoOS=${GoOS}\" -X \"main.GoVersion=`go version`\"" -v
 
 grammar/sysl_parser.go grammar/sysl_lexer.go: grammar/SyslParser.g4 grammar/SyslLexer.g4
 	$(ANTLR) -Dlanguage=Go -lib grammar $^
