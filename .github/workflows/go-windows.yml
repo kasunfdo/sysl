@@ -51,17 +51,18 @@ jobs:
 
     - name: Install
       run: |
-        export GOBIN=$PWD/bin
-        mkdir $GOBIN
-        GIT_TAG="$(echo $GITHUB_REF | cut -d'/' -f3)"
-        GoOS=`go version | cut -d' ' -f4 | cut -d'/' -f1`
-        GoArch=`go version | cut -d' ' -f4 | cut -d'/' -f2`
-        scripts/build.sh install ${GIT_TAG:1} ${GITHUB_SHA} ${GoOS} ${GoArch} ${OSTYPE}
+        bash export GOBIN=$PWD/bin
+        bash mkdir $GOBIN
+        bash GIT_TAG="$(echo $GITHUB_REF | cut -d'/' -f3)"
+        bash GoOS=`go version | cut -d' ' -f4 | cut -d'/' -f1`
+        bash GoArch=`go version | cut -d' ' -f4 | cut -d'/' -f2`
+        echo "scripts/build.sh install ${GIT_TAG:1} ${GITHUB_SHA} ${GoOS} ${GoArch} ${OSTYPE}"
+        bash scripts/build.sh install ${GIT_TAG:1} ${GITHUB_SHA} ${GoOS} ${GoArch} ${OSTYPE}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Test installed
-      run: scripts/test-gosysl.bat
+      run: cmd scripts/test-gosysl.bat
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GOPATH: .
