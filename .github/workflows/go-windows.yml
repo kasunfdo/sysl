@@ -33,8 +33,8 @@ jobs:
 
     - name: Initialize
       run: |
-        bash git config --global core.autocrlf input
-        bash go env
+        git config --global core.autocrlf input
+        go env
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -45,7 +45,7 @@ jobs:
         SYSL_PLANTUML: http://www.plantuml.com/plantuml
 
     - name: Build
-      run: bash go build -v ./...
+      run: go build -v ./...
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
