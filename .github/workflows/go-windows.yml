@@ -27,7 +27,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Get dependencies
-      run: bash go get -v -t -d ./...
+      run: go get -v -t -d ./...
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
