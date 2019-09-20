@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"bou.ke/monkey"
-
 	"github.com/anz-bank/sysl/sysl2/sysl/parse"
 	"github.com/anz-bank/sysl/sysl2/sysl/testutil"
 	"github.com/sirupsen/logrus"
@@ -602,18 +600,9 @@ func TestMain2WithDataMultipleRelationships(t *testing.T) {
 	testutil.AssertFsHasExactly(t, memFs, "/Relational-Model.png", "/Object-Model.png")
 }
 
-func TestShowBinaryInfo(t *testing.T) {
-	fakeExit := func(int) {
-		panic("os.Exit called")
-	}
-	patch := monkey.Patch(os.Exit, fakeExit)
-	defer patch.Unpatch()
-	assert.PanicsWithValue(
-		t,
-		"os.Exit called",
-		func() {
-			err := showBinaryInfo(nil)
-			assert.NoError(t, err)
-		},
-	)
+func TestMain2WithBinaryInfoCmd(t *testing.T) {
+	t.Parallel()
+	logger, _ := test.NewNullLogger()
+	exitCode := main2([]string{"sysl", "info"}, nil, logger, main3)
+	assert.Equal(t, 0, exitCode)
 }
