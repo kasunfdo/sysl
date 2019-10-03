@@ -22,7 +22,7 @@ func buildSyslGrammar(ebnfGrammar *ebnf.Grammar) *sysl.Application {
 }
 
 func generateTypes(grammar *ebnf.Grammar, app *sysl.Application, ruleName string, choices *ebnf.Choice) {
-	if c := ruleSequenceCount(choices.GetSequence()); c == 1 {
+	if c, _ := getCount(choices); c == 1 {
 		attrDefs := map[string]*sysl.Type{}
 		for _, term := range choices.GetSequence()[0].GetTerm() {
 			switch t := term.Atom.Union.(type) {
@@ -230,4 +230,26 @@ func ruleNameCount(terms []*ebnf.Term) int {
 	}
 
 	return count
+}
+
+func getCount(choices *ebnf.Choice) (ruleSeqCount, ruleNameCount int) {
+	ruleSeqCount, ruleNameCount = 0, 0
+	for _, terms := range choices.Sequence {
+		for _, term := range terms.Term {
+			switch t := term.Atom.Union.(type) {
+			case *ebnf.Atom_Rulename:
+				ruleNameCount++
+			case *ebnf.Atom_Choices:
+				_, rnc := getCount(t.Choices)
+				//ruleSeqCount += rsc
+				ruleNameCount += rnc
+			default:
+				continue
+			}
+		}
+		if ruleNameCount > 0 {
+			ruleSeqCount++
+		}
+	}
+	return
 }
