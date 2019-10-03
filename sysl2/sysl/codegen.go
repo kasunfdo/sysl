@@ -246,7 +246,7 @@ func GenerateCode(
 		return nil, err
 	}
 
-	grammarSysl, err := validate.LoadGrammar(codegenParams.grammar, fs)
+	grammarSysl, err := validate.LoadGrammar(codegenParams.grammar, codegenParams.start, fs)
 	if err != nil {
 		msg.NewMsg(msg.WarnValidationSkipped, []string{err.Error()}).LogMsg()
 	} else {

@@ -1,0 +1,1 @@
+startRule: Rule '\n';

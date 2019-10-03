@@ -1,7 +1,11 @@
 package validate
 
 import (
+	"fmt"
+	"sort"
 	"strings"
+
+	parser "github.com/anz-bank/sysl/sysl2/naive"
 
 	sysl "github.com/anz-bank/sysl/src/proto"
 	"github.com/anz-bank/sysl/sysl2/sysl/msg"
@@ -36,7 +40,7 @@ func DoValidate(validateParams Params) error {
 	logrus.Debugf("grammar: %s\n", validateParams.Grammar)
 	logrus.Debugf("start: %s\n", validateParams.Start)
 
-	grammar, err := LoadGrammar(validateParams.Grammar, validateParams.Filesystem)
+	grammar, err := LoadGrammar(validateParams.Grammar, validateParams.Start, validateParams.Filesystem)
 	if err != nil {
 		return err
 	}
@@ -298,7 +302,46 @@ func loadTransform(transformFile string, fs afero.Fs, p *parse.Parser) (*sysl.Ap
 
 // LoadGrammar loads sysl conversion of given grammar.
 // eg: if grammarFile is ./foo/bar.g, this tries to load ./foo/bar.sysl
-func LoadGrammar(grammarFile string, fs afero.Fs) (*sysl.Application, error) {
+func LoadGrammar(grammarFile, start string, fs afero.Fs) (*sysl.Application, error) {
+	dat, err := afero.ReadFile(fs, grammarFile)
+	if err != nil {
+		return nil, err
+	}
+	tokens := strings.Split(grammarFile, "/")
+	rootGrammar := strings.Join(tokens[:len(tokens)-1], "/")
+	grammarFileName := tokens[len(tokens)-1]
+
+	tokens = strings.Split(grammarFileName, ".")
+	tokens[len(tokens)-1] = "sysl"
+	grammarSyslFile := strings.Join(tokens, ".")
+	p := parse.NewParser()
+
+	grammar2, name, err := parse.LoadAndGetDefaultApp(grammarSyslFile, syslutil.NewChrootFs(fs, rootGrammar), p)
+
+	gram := parser.ParseEBNF(string(dat), "gen", start)
+	grammar := buildSyslGrammar(gram)
+
+	var keys1 []string
+	var keys2 []string
+	for tname, _ := range grammar.Types {
+		keys1 = append(keys1, tname)
+	}
+	for tname, _ := range grammar2.Apps[name].Types {
+		keys2 = append(keys2, tname)
+	}
+	sort.Strings(keys1)
+	sort.Strings(keys2)
+	fmt.Println(keys1)
+	fmt.Println("------------------------------------------")
+	fmt.Println(keys2)
+	fmt.Println("------------------------------------------")
+
+	return grammar, nil
+}
+
+// LoadGrammar loads sysl conversion of given grammar.
+// eg: if grammarFile is ./foo/bar.g, this tries to load ./foo/bar.sysl
+func LoadGrammar2(grammarFile string, fs afero.Fs) (*sysl.Application, error) {
 	tokens := strings.Split(grammarFile, "/")
 	rootGrammar := strings.Join(tokens[:len(tokens)-1], "/")
 	grammarFileName := tokens[len(tokens)-1]

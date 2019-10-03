@@ -16,4 +16,5 @@ require (
 	github.com/spf13/afero v1.2.2
 	github.com/stretchr/testify v1.4.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
+	gotest.tools v2.2.0+incompatible
 )
